@@ -1,0 +1,36 @@
+pipeline:
+  name: "IDS GAN Feature Extraction Pipeline"
+  random_seed: 42
+
+data:
+  input_path: "data/raw/NS CP PACKETS.csv"
+  processed_dir: "data/processed"
+  reports_dir: "data/reports"
+  plots_dir: "data/plots"
+  models_dir: "models"
+  logs_dir: "logs"
+  sampling_size: null  # Set to integer e.g. 100000 for subset, or null for full dataset
+
+flow:
+  flow_timeout: 120.0  # seconds before splitting inactive flow
+
+visualization:
+  dpi: 300
+  style: "seaborn-v0_8-whitegrid"
+  palette: "deep"
+
+ml:
+  isolation_forest:
+    n_estimators: 100
+    contamination: 0.05
+    random_state: 42
+  one_class_svm:
+    nu: 0.05
+    kernel: "rbf"
+    gamma: "scale"
+  dbscan:
+    eps: 0.8
+    min_samples: 5
+  kmeans:
+    n_clusters: 4
+    random_state: 42
