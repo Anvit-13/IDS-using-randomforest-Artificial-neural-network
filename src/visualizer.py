@@ -266,3 +266,154 @@ class Visualizer:
         plt.ylabel("Data Rate (KB/s)", fontsize=12)
         plt.grid(True, linestyle="--", alpha=0.6)
         self._save_fig("linegraph_bytes_per_second")
+
+    def generate_investigation_plots(
+        self,
+        investigation_df: pd.DataFrame,
+        anomaly_df: pd.DataFrame,
+        inv_summary: Dict,
+    ) -> None:
+        """Generates all Flow Investigation visualization figures.
+
+        Args:
+            investigation_df: DataFrame containing consensus anomalous flows.
+            anomaly_df: Full ML prediction DataFrame.
+            inv_summary: Investigation summary dictionary.
+        """
+        logger.info("Generating Flow Investigation visualization figures...")
+        if investigation_df.empty:
+            logger.warning("Investigation DataFrame is empty. Skipping investigation plots.")
+            return
+
+        self.plot_investigation_anomalous_flows_by_protocol(inv_summary.get("anomalous_flows_by_protocol", {}))
+        self.plot_investigation_anomalous_packets_by_protocol(inv_summary.get("anomalous_packets_by_protocol", {}))
+        self.plot_investigation_top_source_ips(inv_summary.get("top_anomalous_source_ips", {}))
+        self.plot_investigation_top_dest_ips(inv_summary.get("top_anomalous_destination_ips", {}))
+        self.plot_investigation_category_distribution(inv_summary.get("most_common_possible_categories", {}))
+        self.plot_investigation_behaviour_distribution(inv_summary.get("most_common_behaviours", {}))
+        self.plot_investigation_model_agreement(anomaly_df)
+
+        logger.info("All Flow Investigation plots generated successfully.")
+
+    def plot_investigation_anomalous_flows_by_protocol(self, proto_dict: Dict[str, int]) -> None:
+        """Investigation Plot 1: Anomalous Flows by Protocol."""
+        if not proto_dict:
+            return
+        plt.figure(figsize=(10, 6))
+        series = pd.Series(proto_dict).head(10)
+        ax = sns.barplot(x=series.values, y=series.index, hue=series.index, palette="Reds_r", legend=False)
+        plt.title("Consensus Anomalous Flows by Protocol", fontsize=14, fontweight="bold")
+        plt.xlabel("Anomalous Flow Count", fontsize=12)
+        plt.ylabel("Protocol", fontsize=12)
+        for p in ax.patches:
+            width = p.get_width()
+            ax.annotate(f"{int(width):,}", (width, p.get_y() + p.get_height() / 2.),
+                        ha="left", va="center", fontsize=10, xytext=(5, 0), textcoords="offset points")
+        self._save_fig("investigation_anomalous_flows_by_protocol")
+
+    def plot_investigation_anomalous_packets_by_protocol(self, proto_pkts_dict: Dict[str, int]) -> None:
+        """Investigation Plot 2: Packets in Anomalous Flows by Protocol."""
+        if not proto_pkts_dict:
+            return
+        plt.figure(figsize=(10, 6))
+        series = pd.Series(proto_pkts_dict).head(10)
+        ax = sns.barplot(x=series.values, y=series.index, hue=series.index, palette="Oranges_r", legend=False)
+        plt.title("Anomalous Flow Packets by Protocol", fontsize=14, fontweight="bold")
+        plt.xlabel("Total Packets", fontsize=12)
+        plt.ylabel("Protocol", fontsize=12)
+        for p in ax.patches:
+            width = p.get_width()
+            ax.annotate(f"{int(width):,}", (width, p.get_y() + p.get_height() / 2.),
+                        ha="left", va="center", fontsize=10, xytext=(5, 0), textcoords="offset points")
+        self._save_fig("investigation_anomalous_packets_by_protocol")
+
+    def plot_investigation_top_source_ips(self, top_src: Dict[str, int]) -> None:
+        """Investigation Plot 3: Top Anomalous Source IPs."""
+        if not top_src:
+            return
+        plt.figure(figsize=(10, 6))
+        series = pd.Series(top_src).head(10)
+        ax = sns.barplot(x=series.values, y=series.index, hue=series.index, palette="YlOrRd_r", legend=False)
+        plt.title("Top 10 Anomalous Source IP Addresses", fontsize=14, fontweight="bold")
+        plt.xlabel("Anomalous Flow Count", fontsize=12)
+        plt.ylabel("Source IP", fontsize=12)
+        for p in ax.patches:
+            width = p.get_width()
+            ax.annotate(f"{int(width):,}", (width, p.get_y() + p.get_height() / 2.),
+                        ha="left", va="center", fontsize=10, xytext=(5, 0), textcoords="offset points")
+        self._save_fig("investigation_top_source_ips")
+
+    def plot_investigation_top_dest_ips(self, top_dst: Dict[str, int]) -> None:
+        """Investigation Plot 4: Top Anomalous Destination IPs."""
+        if not top_dst:
+            return
+        plt.figure(figsize=(10, 6))
+        series = pd.Series(top_dst).head(10)
+        ax = sns.barplot(x=series.values, y=series.index, hue=series.index, palette="Purples_r", legend=False)
+        plt.title("Top 10 Anomalous Destination IP Addresses", fontsize=14, fontweight="bold")
+        plt.xlabel("Anomalous Flow Count", fontsize=12)
+        plt.ylabel("Destination IP", fontsize=12)
+        for p in ax.patches:
+            width = p.get_width()
+            ax.annotate(f"{int(width):,}", (width, p.get_y() + p.get_height() / 2.),
+                        ha="left", va="center", fontsize=10, xytext=(5, 0), textcoords="offset points")
+        self._save_fig("investigation_top_destination_ips")
+
+    def plot_investigation_category_distribution(self, cat_dict: Dict[str, int]) -> None:
+        """Investigation Plot 5: Potential Anomaly Category Breakdown."""
+        if not cat_dict:
+            return
+        plt.figure(figsize=(10, 6))
+        series = pd.Series(cat_dict)
+        ax = sns.barplot(x=series.values, y=series.index, hue=series.index, palette="mako", legend=False)
+        plt.title("Possible Anomaly Categories Breakdown", fontsize=14, fontweight="bold")
+        plt.xlabel("Flow Count", fontsize=12)
+        plt.ylabel("Possible Category", fontsize=12)
+        for p in ax.patches:
+            width = p.get_width()
+            ax.annotate(f"{int(width):,}", (width, p.get_y() + p.get_height() / 2.),
+                        ha="left", va="center", fontsize=10, xytext=(5, 0), textcoords="offset points")
+        self._save_fig("investigation_category_distribution")
+
+    def plot_investigation_behaviour_distribution(self, beh_dict: Dict[str, int]) -> None:
+        """Investigation Plot 6: Observable Behaviours Frequency."""
+        if not beh_dict:
+            return
+        plt.figure(figsize=(10, 6))
+        series = pd.Series(beh_dict).head(10)
+        ax = sns.barplot(x=series.values, y=series.index, hue=series.index, palette="viridis", legend=False)
+        plt.title("Most Common Observable Traffic Behaviours", fontsize=14, fontweight="bold")
+        plt.xlabel("Trigger Count", fontsize=12)
+        plt.ylabel("Behaviour Indicator", fontsize=12)
+        for p in ax.patches:
+            width = p.get_width()
+            ax.annotate(f"{int(width):,}", (width, p.get_y() + p.get_height() / 2.),
+                        ha="left", va="center", fontsize=10, xytext=(5, 0), textcoords="offset points")
+        self._save_fig("investigation_behaviour_distribution")
+
+    def plot_investigation_model_agreement(self, anomaly_df: pd.DataFrame) -> None:
+        """Investigation Plot 7: Model Consensus Agreement Matrix."""
+        if anomaly_df.empty:
+            return
+        plt.figure(figsize=(8, 6))
+        
+        iso_anom = (anomaly_df["IsoForest_Pred"] == -1)
+        ocsvm_anom = (anomaly_df["OneClassSVM_Pred"] == -1)
+        db_anom = (anomaly_df["DBSCAN_Anomaly"] == -1)
+        
+        vote_count = iso_anom.astype(int) + ocsvm_anom.astype(int) + db_anom.astype(int)
+        vote_dist = vote_count.value_counts().sort_index()
+
+        labels = [
+            f"0 Models (Normal: {vote_dist.get(0, 0):,})",
+            f"1 Model (Minority: {vote_dist.get(1, 0):,})",
+            f"2 Models (Consensus: {vote_dist.get(2, 0):,})",
+            f"3 Models (Unanimous: {vote_dist.get(3, 0):,})",
+        ]
+        values = [vote_dist.get(0, 0), vote_dist.get(1, 0), vote_dist.get(2, 0), vote_dist.get(3, 0)]
+        colors = ["#2ca02c", "#bcbd22", "#ff7f0e", "#d62728"]
+
+        plt.pie(values, labels=labels, autopct="%1.1f%%", startangle=140, colors=colors)
+        plt.title("ML Model Agreement & Consensus Anomaly Breakdown", fontsize=14, fontweight="bold")
+        self._save_fig("investigation_model_agreement")
+

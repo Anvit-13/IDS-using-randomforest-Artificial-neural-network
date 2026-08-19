@@ -19,6 +19,7 @@ from src.data_cleaner import DataCleaner
 from src.data_loader import DataLoader
 from src.feature_extractor import FeatureExtractor
 from src.flow_generator import FlowGenerator
+from src.flow_investigator import FlowInvestigator
 from src.logger import setup_logger
 from src.ml_pipeline import MLPipeline
 from src.report_generator import ReportGenerator
@@ -57,7 +58,7 @@ def run_pipeline(
     input_paths: Optional[List[Path]] = None,
     sampling_size: Optional[int] = None,
 ) -> None:
-    """Runs the complete 18-step IDS GAN Feature Extraction Pipeline.
+    """Runs the complete 18-step IDS GAN Feature Extraction & Flow Investigation Pipeline.
 
     Args:
         config_path: Path to configuration YAML file.
@@ -66,8 +67,8 @@ def run_pipeline(
     """
     console.print(
         Panel.fit(
-            "[bold white on blue] IDS GAN Feature Extraction Pipeline [/bold white on blue]\n"
-            "[italic gold1]Research-Grade Wireshark Packet Analysis & GAN Feature Engineering[/italic gold1]",
+            "[bold white on blue] IDS GAN Feature Extraction & Investigation Pipeline [/bold white on blue]\n"
+            "[italic gold1]Research-Grade Wireshark Packet Analysis, Anomaly Detection & Flow Traceability[/italic gold1]",
             border_style="blue",
         )
     )
@@ -118,6 +119,7 @@ def run_pipeline(
         task_flow = progress.add_task("[yellow]Step 4 & 5: Generating Network Flows & Flow Metrics...", total=1)
         flow_gen = FlowGenerator(feature_packet_df, flow_timeout=flow_timeout)
         flow_df = flow_gen.generate_flows()
+        packet_df_with_flows = flow_gen.get_packet_df()
         progress.update(task_flow, completed=1)
 
         # Step 7: Statistical Analysis
@@ -126,7 +128,7 @@ def run_pipeline(
         stat_results = analyzer.run_full_analysis()
         progress.update(task_stat, completed=1)
 
-        # Step 8: Visualization
+        # Step 8: Base Visualization
         task_vis = progress.add_task("[red]Step 8: Generating 300 DPI Publication Plots...", total=1)
         visualizer = Visualizer(output_dir=plots_dir, dpi=dpi)
         visualizer.generate_all_plots(feature_packet_df, flow_df, stat_results)
@@ -138,11 +140,28 @@ def run_pipeline(
         gan_ready_df, anomaly_df = ml.run_pipeline()
         progress.update(task_ml, completed=1)
 
+        # Step 12: Flow Investigation & Packet Traceability
+        task_inv = progress.add_task("[bright_yellow]Step 12: Flow Investigation & Packet Traceability...", total=1)
+        investigator = FlowInvestigator(flow_df, anomaly_df, packet_df_with_flows)
+        investigation_df = investigator.investigation_df
+        inv_summary = investigator.generate_investigation_summary()
+        rep_flows = investigator.get_representative_flows(category="all", top_n=20)
+        rep_packets_df = investigator.get_packets_for_flows(rep_flows["FlowID"].tolist())
+        visualizer.generate_investigation_plots(investigation_df, anomaly_df, inv_summary)
+        progress.update(task_inv, completed=1)
+
         # Step 10 & 11: Export Reports & Datasets
         task_rep = progress.add_task("[bright_green]Step 10 & 11: Exporting Reports & Processed Files...", total=1)
         reporter = ReportGenerator(reports_dir=reports_dir, processed_dir=processed_dir)
         reporter.export_processed_datasets(feature_packet_df, gan_ready_df)
-        reporter.generate_all_reports(stat_results, cleaning_report, anomaly_df)
+        reporter.generate_all_reports(
+            stat_results=stat_results,
+            cleaning_report=cleaning_report,
+            anomaly_df=anomaly_df,
+            investigation_df=investigation_df,
+            rep_packets_df=rep_packets_df,
+            inv_summary=inv_summary,
+        )
         progress.update(task_rep, completed=1)
 
     console.print(
@@ -150,9 +169,11 @@ def run_pipeline(
             "[bold green] PIPELINE EXECUTION SUCCESSFUL! [/bold green]\n\n"
             f"[white]Clean Packets File:[/white] {processed_dir / 'clean_packets.csv'}\n"
             f"[white]GAN Flow Features File:[/white] {processed_dir / 'flow_features.csv'}\n"
-            f"[white]Anomaly Report:[/white] {reports_dir / 'anomaly_report.csv'}\n"
-            f"[white]Summary Report:[/white] {reports_dir / 'summary.json'}\n"
-            f"[white]Figures Saved to:[/white] {plots_dir} (14 PNG + SVG pairs, 300 DPI)\n"
+            f"[white]Flow Investigation Table:[/white] {reports_dir / 'flow_investigation.csv'}\n"
+            f"[white]Representative Packets Export:[/white] {reports_dir / 'representative_anomalous_packets.csv'}\n"
+            f"[white]Anomaly Evaluation Report:[/white] {reports_dir / 'anomaly_report.csv'}\n"
+            f"[white]Summary JSON Report:[/white] {reports_dir / 'summary.json'}\n"
+            f"[white]Figures Saved to:[/white] {plots_dir} (21 PNG + SVG pairs, 300 DPI)\n"
             f"[white]Models Saved to:[/white] {models_dir}",
             border_style="green",
         )

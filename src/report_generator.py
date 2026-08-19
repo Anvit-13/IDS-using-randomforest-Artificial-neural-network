@@ -63,6 +63,9 @@ class ReportGenerator:
         stat_results: Dict[str, Any],
         cleaning_report: Dict[str, Any],
         anomaly_df: pd.DataFrame,
+        investigation_df: Optional[pd.DataFrame] = None,
+        rep_packets_df: Optional[pd.DataFrame] = None,
+        inv_summary: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Generates all CSV, TXT, JSON, HTML, and Markdown summary reports.
 
@@ -70,6 +73,9 @@ class ReportGenerator:
             stat_results: Output dictionary from StatAnalyzer.
             cleaning_report: Output dictionary from DataCleaner.
             anomaly_df: Anomaly predictions DataFrame from MLPipeline.
+            investigation_df: Optional Flow Investigation Table DataFrame.
+            rep_packets_df: Optional representative anomalous packet DataFrame.
+            inv_summary: Optional Flow Investigation summary dictionary.
         """
         logger.info("Generating and exporting pipeline reports...")
 
@@ -81,20 +87,37 @@ class ReportGenerator:
         anomaly_df.to_csv(anomaly_path, index=False)
         logger.info(f"Saved anomaly evaluation report to '{anomaly_path}'.")
 
-        # 3. Summary JSON
-        summary_json = self._build_summary_json(stat_results, cleaning_report, anomaly_df)
+        # 3. Flow Investigation CSVs
+        if investigation_df is not None and not investigation_df.empty:
+            inv_path = self.reports_dir / "flow_investigation.csv"
+            # Format observed_behaviours list for CSV export if needed
+            export_inv_df = investigation_df.copy()
+            if "observed_behaviours" in export_inv_df.columns:
+                export_inv_df["observed_behaviours"] = export_inv_df["observed_behaviours"].apply(
+                    lambda x: ", ".join(x) if isinstance(x, list) else str(x)
+                )
+            export_inv_df.to_csv(inv_path, index=False)
+            logger.info(f"Saved Flow Investigation Table ({len(export_inv_df):,} flows) to '{inv_path}'.")
+
+        if rep_packets_df is not None and not rep_packets_df.empty:
+            rep_packets_path = self.reports_dir / "representative_anomalous_packets.csv"
+            rep_packets_df.to_csv(rep_packets_path, index=False)
+            logger.info(f"Saved representative anomalous packets ({len(rep_packets_df):,} packets) to '{rep_packets_path}'.")
+
+        # 4. Summary JSON
+        summary_json = self._build_summary_json(stat_results, cleaning_report, anomaly_df, inv_summary)
         json_path = self.reports_dir / "summary.json"
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(summary_json, f, indent=4)
         logger.info(f"Saved summary JSON to '{json_path}'.")
 
-        # 4. Text Summary Report
+        # 5. Text Summary Report
         self._export_txt_report(summary_json)
 
-        # 5. Markdown Report (Bonus)
+        # 6. Markdown Report
         self._export_markdown_report(summary_json)
 
-        # 6. HTML Report (Bonus)
+        # 7. HTML Report
         self._export_html_report(summary_json)
 
         logger.info("All pipeline reports generated successfully.")
@@ -122,6 +145,7 @@ class ReportGenerator:
         stat_results: Dict[str, Any],
         cleaning_report: Dict[str, Any],
         anomaly_df: pd.DataFrame,
+        inv_summary: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Constructs comprehensive nested dictionary for summary JSON export."""
         summary = stat_results.get("dataset_summary", {}).copy()
@@ -148,6 +172,9 @@ class ReportGenerator:
             "consensus_anomalies": consensus_anomalies,
             "anomaly_rate_percent": round((consensus_anomalies / max(1, total_flows)) * 100, 2),
         }
+
+        if inv_summary:
+            summary["flow_investigation_summary"] = inv_summary
 
         return summary
 

@@ -182,3 +182,12 @@ class FlowGenerator:
 
         flow_features_df = agg_df[columns_order].copy()
         return flow_features_df
+
+    def get_packet_df(self) -> pd.DataFrame:
+        """Returns packet-level DataFrame enriched with assigned FlowIDs.
+
+        Returns:
+            pd.DataFrame: Packet DataFrame with FlowID column.
+        """
+        return self.df.copy()
+
